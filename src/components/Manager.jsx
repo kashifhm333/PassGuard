@@ -1,16 +1,11 @@
-import React from 'react'
-import { useRef, useState, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
+
+const API_BASE_URL = 'http://localhost:3000';
+
 const Manager = () => {
     const ref = useRef();
     const [passwordArray, setpasswordArray] = useState([]);
     const passwordRef = useRef()
-
-    useEffect(() => {
-        let password = localStorage.getItem("passwords");
-        if (password) {
-            setpasswordArray(JSON.parse(password));
-        }
-    }, []);
 
 
 
@@ -19,6 +14,24 @@ const Manager = () => {
         username: "",
         password: ""
     });
+
+    useEffect(() => {
+        const fetchPasswords = async () => {
+            try {
+                const response = await fetch(`${API_BASE_URL}/`);
+                if (!response.ok) {
+                    throw new Error('Failed to load passwords');
+                }
+
+                const passwords = await response.json();
+                setpasswordArray(passwords);
+            } catch (error) {
+                console.error(error);
+            }
+        };
+
+        fetchPasswords();
+    }, []);
 
 
     const showPassword = () => {
@@ -31,11 +44,31 @@ const Manager = () => {
         }
     }
 
-    const savePassword = () => {
-        console.log(form);
-        setpasswordArray([...passwordArray, form]);
-        localStorage.setItem("passwords", JSON.stringify([...passwordArray, form]));
-        console.log(passwordArray);
+    const savePassword = async () => {
+        try {
+            const passwordPayload = {
+                id: crypto.randomUUID(),
+                ...form,
+            };
+
+            const response = await fetch(`${API_BASE_URL}/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(passwordPayload),
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to save password');
+            }
+
+            const data = await response.json();
+            setpasswordArray((currentPasswords) => [...currentPasswords, data.result]);
+            setform({ site: '', username: '', password: '' });
+        } catch (error) {
+            console.error(error);
+        }
     }
 
     const handleChange = (e) => {
@@ -47,7 +80,7 @@ const Manager = () => {
 
     return (
         <>
-            <div className="absolute inset-0 -z-10 min-h-screen w-full bg-white [background:radial-gradient(125%_125%_at_50%_10%,#fff_40%,#63e_100%)]">
+            <div className="absolute inset-0 -z-10 min-h-screen w-full bg-white [background:radial-gradient(125%_125%_at_50%_10%,#fff_40%,#63e_100%)]"></div>
             <div className="mx-auto w-full max-w-6xl px-4 pb-28 pt-4 sm:px-8 lg:px-12">
                 <h1 className='text-2xl font-bold text-center'>
                     <span className='text-green-700'>&lt;</span>
@@ -107,7 +140,7 @@ const Manager = () => {
                     </table></div>}
                 </div>
             </div>
-            </div>
+            
         </>
     )
 }
