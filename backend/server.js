@@ -62,6 +62,21 @@ app.delete('/', async (req, res) => {
   }
 });
 
+// 4. Update a password by ID
+app.put('/', async (req, res) => {
+  try {
+    const { id, site, username, password } = req.body;
+    const updatedPassword = await Password.findOneAndUpdate(
+      { id },
+      { site, username, password },
+      { new: true }
+    );
+    res.json({ success: true, result: updatedPassword });
+  } catch {
+    res.status(500).json({ error: 'Failed to update password' });
+  }
+});
+
 // Start Server
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);

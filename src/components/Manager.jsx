@@ -9,6 +9,8 @@ const Manager = () => {
 
 
 
+    const [editId, setEditId] = useState(null);
+
     const [form, setform] = useState({
         site: "",
         username: "",
@@ -33,7 +35,6 @@ const Manager = () => {
         fetchPasswords();
     }, []);
 
-
     const showPassword = () => {
         // alert("This feature is not implemented yet. Please check back later.");
         passwordRef.current.type = "text";
@@ -45,27 +46,91 @@ const Manager = () => {
     }
 
     const savePassword = async () => {
-        try {
-            const passwordPayload = {
-                id: crypto.randomUUID(),
-                ...form,
-            };
+        if (!form.site || !form.username || !form.password) {
+            alert("Please fill in all fields!");
+            return;
+        }
 
+        try {
+            if (editId) {
+                // Update existing password
+                const updatedPayload = { id: editId, ...form };
+                const response = await fetch(`${API_BASE_URL}/`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(updatedPayload),
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to update password');
+                }
+
+                setpasswordArray(passwordArray.map(item => item.id === editId ? updatedPayload : item));
+                setEditId(null);
+            } else {
+                // Save new password
+                const passwordPayload = {
+                    id: crypto.randomUUID(),
+                    ...form,
+                };
+
+                const response = await fetch(`${API_BASE_URL}/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(passwordPayload),
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to save password');
+                }
+
+                const data = await response.json();
+                setpasswordArray((currentPasswords) => [...currentPasswords, data.result || passwordPayload]);
+            }
+            setform({ site: '', username: '', password: '' });
+        } catch (error) {
+            console.error(error);
+        }
+    }
+
+    const editPassword = (id) => {
+        const passwordToEdit = passwordArray.find(i => i.id === id);
+        if (passwordToEdit) {
+            setform({ site: passwordToEdit.site, username: passwordToEdit.username, password: passwordToEdit.password });
+            setEditId(id);
+        }
+    }
+
+    const cancelEdit = () => {
+        setform({ site: '', username: '', password: '' });
+        setEditId(null);
+    }
+
+    const deletePassword = async (id) => {
+        const isConfirmed = window.confirm("Do you really want to delete this password?");
+        if (!isConfirmed) return;
+
+        try {
             const response = await fetch(`${API_BASE_URL}/`, {
-                method: 'POST',
+                method: 'DELETE',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(passwordPayload),
+                body: JSON.stringify({ id }),
             });
 
             if (!response.ok) {
-                throw new Error('Failed to save password');
+                throw new Error('Failed to delete password');
             }
 
-            const data = await response.json();
-            setpasswordArray((currentPasswords) => [...currentPasswords, data.result]);
-            setform({ site: '', username: '', password: '' });
+            setpasswordArray(passwordArray.filter(item => item.id !== id));
+            if (editId === id) {
+                cancelEdit();
+            }
         } catch (error) {
             console.error(error);
         }
@@ -74,9 +139,6 @@ const Manager = () => {
     const handleChange = (e) => {
         setform({ ...form, [e.target.name]: e.target.value })
     }
-
-
-
 
     return (
         <>
@@ -101,18 +163,21 @@ const Manager = () => {
                                 <img ref={ref} className='p-1 cursor-pointer' width="25" src="https://cdn-icons-png.flaticon.com/512/159/159604.png" alt="" />
                             </span>
                         </div>
-
-
                     </div>
-                    <div className='flex justify-center w-full'>
-                        <button onClick={savePassword} className='flex w-full items-center justify-center gap-2 rounded-full bg-green-500 py-2 font-bold text-white hover:bg-green-600 sm:w-1/2 md:w-1/3 lg:w-1/4'>
+                    <div className='flex justify-center gap-4 w-full'>
+                        <button onClick={savePassword} className='flex w-full items-center justify-center gap-2 rounded-full bg-green-500 py-2 font-bold text-white hover:bg-green-600 sm:w-1/2 md:w-1/3 lg:w-1/4 cursor-pointer'>
                             <lord-icon
                                 src="https://cdn.lordicon.com/vjgknpfx.json"
                                 trigger="hover"
                                 colors="primary:#2516c7,secondary:#000000">
                             </lord-icon>
-                            Add
+                            {editId ? 'Update Password' : 'Add Password'}
                         </button>
+                        {editId && (
+                            <button onClick={cancelEdit} className='flex items-center justify-center gap-2 rounded-full bg-gray-500 py-2 px-6 font-bold text-white hover:bg-gray-600 cursor-pointer'>
+                                Cancel
+                            </button>
+                        )}
                     </div>
                 </div>
                 <div className="password px-4 pb-6">
@@ -125,14 +190,35 @@ const Manager = () => {
                                 <th className='py-2'>Site</th>
                                 <th className='py-2'>Username</th>
                                 <th className='py-2'>Password</th>
+                                <th className='py-2'>Actions</th>
                             </tr>
                         </thead>
                         <tbody className='bg-green-100'>
                             {passwordArray.map((item, index) => {
-                                return <tr key={index}>
-                                <td className='w-32 px-2 py-2 text-center'><a className='break-all' href={item.site} target="_blank" rel="noopener noreferrer">{item.site}</a></td>
+                                return <tr key={item.id || index}>
+                                <td className='w-32 px-2 py-2 text-center'><a className='break-all' href={item.site.startsWith('http') ? item.site : `https://${item.site}`} target="_blank" rel="noopener noreferrer">{item.site}</a></td>
                                 <td className='w-32 px-2 py-2 text-center break-all'>{item.username}</td>
                                 <td className='w-32 px-2 py-2 text-center break-all'>{item.password}</td>
+                                <td className='w-32 px-2 py-2 text-center'>
+                                    <div className='flex items-center justify-center gap-3'>
+                                        <span className='cursor-pointer hover:scale-110 transition-transform p-1 flex items-center justify-center text-green-700' onClick={() => editPassword(item.id)} title="Edit Password">
+                                            <lord-icon
+                                                src="https://cdn.lordicon.com/gwlusjdu.json"
+                                                trigger="hover"
+                                                style={{ width: "25px", height: "25px" }}>
+                                            </lord-icon>
+                                            
+                                        </span>
+                                        <span className='cursor-pointer hover:scale-110 transition-transform p-1 flex items-center justify-center text-red-600' onClick={() => deletePassword(item.id)} title="Delete Password">
+                                            <lord-icon
+                                                src="https://cdn.lordicon.com/gsqxdxog.json"
+                                                trigger="hover"
+                                                style={{ width: "25px", height: "25px" }}>
+                                            </lord-icon>
+                                           
+                                        </span>
+                                    </div>
+                                </td>
                             </tr>
                              })}
                            
@@ -140,7 +226,6 @@ const Manager = () => {
                     </table></div>}
                 </div>
             </div>
-            
         </>
     )
 }
