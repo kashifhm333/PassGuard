@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-const API_BASE_URL = 'http://localhost:3000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || (window.location.port === '5173' ? 'http://localhost:3000' : '/api');
 
 const Manager = () => {
     const ref = useRef();
